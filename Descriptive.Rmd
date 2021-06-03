@@ -7,7 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyverse)
 library(rio)
@@ -18,6 +17,8 @@ library(stringr)
 library(tableone)
 library(labelled)
 library(doBy) # For calculating summary mean,sd,median,IQR by groups
+library(gtsummary) # For summarizing regression analysis in tables
+library(jtools) # For summary of regression analysis
 ```
 
 ```{r, adding variables and others}
@@ -73,8 +74,6 @@ dt$delay <- round(difftime(end.time,start.time, units = "hours"),0)
 start.time <- paste(dt$doar, dt$toar)
 end.time <- paste(dt$doa, dt$toa)
 dt$t.delay <- round(difftime(end.time,start.time, units = "days"),0)
-
-table(dt$t.delay)
 
 # --------------------------- In-Hospital -------------------------------
 
@@ -231,7 +230,14 @@ start.time <- paste(dt$doa, dt$toa)
 end.time <- paste(dt$dodd, dt$todd)
 dt$lohp<- as.numeric(round(difftime(end.time,start.time, units = "days"),0))
 
+## Time of death
+
+start.time <- paste(dt$doi, dt$toi)
+end.time <- paste(dt$dodd, dt$todd)
+dt$tod <- as.numeric(round(difftime(end.time,start.time, units = "days"),0))
+
 ```
+
 ```{r, result}
 
 # --------------------------- Demographics ---------------------------
@@ -315,9 +321,9 @@ knitr::kable(print(Table9,
 
 died <- ifelse(dt$died=="Yes",1,0)
 
-m <- glm(died~dt$agegrp, family = binomial(link = "logit"))
-summary(m)
-exp(m$coefficients)
+m1 <- glm(died~dt$agegrp, family = binomial(link = "logit"))
+
+t1 <- tbl_regression(m1, exponentiate=TRUE)
 
 # create a cross tabulation of age and diabetes status  
 dm_by_age <- table(dt$age, died) 
@@ -331,7 +337,7 @@ odds <- freq_table[, "1"]/freq_table[, "0"]
 # calculate the log odds 
 logodds <- log(odds) 
 
-# plot the ages found in the sample against the log odds of having mortality 
+# PLOT the ages found in the sample against the log odds of having mortality 
 plot(rownames(freq_table), logodds) 
 
 # create a cross tabulation of ISS and mortality status  
@@ -346,7 +352,7 @@ odds <- freq_table[, "1"]/freq_table[, "0"]
 # calculate the log odds 
 logodds <- log(odds) 
 
-# plot the ages found in the sample against the log odds of having mortality 
+# PLOT the ages found in the sample against the log odds of having mortality 
 plot(rownames(freq_table), logodds)   
 
 # regression analysis of delay and mortality
@@ -355,25 +361,28 @@ first.delay.2 <- as.factor(ifelse(dt$delay <25, "within 24hrs",
                                   ifelse(dt$delay>24 & dt$delay<73,"24-72hrs",
                                          ifelse(dt$delay>72 & dt$delay<169,"3-7days",">7 days"))))
 
+# Checking for levels 
+levels(first.delay.2)
 
-de <- glm(died ~ first.delay.2, family = binomial(link = "logit"))
+#Relevel if required
+#first.delay.2 <- relevel(first.delay.2,ref = "3-7days")
 
-summary(de)
-exp(de$coefficients)
+#model 2 for first delay and mortality
+m2 <- glm(died ~ first.delay.2, family = binomial(link = "logit"))
 
-##Interpretation
-# The logodds of mortality with delay of within 24hrs is 0.243 (std error - 0.18) [p- 0.185]
-# The logodds of mortality with delay of 24-72hrs is 0.146 (0.20) [p-0.474]
-# The logodds of mortality with delay of 3-7days is -0.154 (0.23) [p-0.509]
+#Odds ratio table for model 2
+t2 <- tbl_regression(m2, exponentiate=TRUE)
 
 # regression analysis of delay and mortality
 
 first.delay.1 <- as.factor(ifelse(dt$delay <7, "early arrival", "delayed arrival"))
 
-de <- glm(died ~ delay, family = binomial(link = "logit"))
+levels(first.delay.1)
 
-summary(de)
-exp(de$coefficients)
+m3 <- glm(died ~ first.delay.1, family = binomial(link = "logit"))
+
+t3 <- tbl_regression(m3, exponentiate = TRUE)
+
 
 ##Interpretation
 #The logodds of mortality with delay of within 6 hours is -0.06 (std error-0.08) over delay of more than 6hrs
@@ -384,11 +393,19 @@ exp(de$coefficients)
 
 first.t.delay <- as.factor(ifelse(dt$t.delay <7, "within 1hr", "delayed arrival"))
 
-de <- glm(died ~ delay, family = binomial(link = "logit"))
+m4 <- glm(died ~ delay, family = binomial(link = "logit"))
 
-summary(de)
-exp(de$coefficients)
+t4 <- tbl_regression(m4, exponentiate = TRUE)
 
+# Categorising time of death using median time of death which is 5 days
+dt$todp <- as.factor(ifelse(dt$tod<6,"within 5days","more than 5days"))
+
+#Logistic regression on time of death and ISS
+m5 <- glm(died ~ dt$todp + dt$isspv, family = binomial(link = "logit"))
+
+t5 <- tbl_regression(m5, exponentiate = TRUE)
+
+summ(m5, exp=T)
 
 ```
 
