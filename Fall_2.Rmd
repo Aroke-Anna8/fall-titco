@@ -1,0 +1,447 @@
+---
+title: "Fall_2"
+author: "Anna"
+date: "08/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(dbplyr)
+
+library(tidyverse)
+library(rio)
+library(rlist) #For the calculating percent and n
+library(tidyr)
+
+library(stringr)
+library(tableone)
+library(labelled)
+library(doBy) # For calculating summary mean,sd,median,IQR by groups
+library(gtsummary) # For summarizing regression analysis in tables
+library(jtools) # For summary of regression analysis
+library(ggplot2)
+library(ggpubr)
+library(survival) #For kaplan meir
+library(survminer) #For colorful kaplan meir chart
+```
+
+
+```{r cars}
+
+#TITCO dataset
+## Using the url
+url <- "https://raw.githubusercontent.com/titco/titco-I/master/titco-I-full-dataset-v1.csv"
+titco <-  import(url) %>% as_tibble()
+
+n <- subset(titco, titco$moi == "Fall")
+
+#table(n$died) # 944 (18.1%) Mortality
+
+#Adding columns
+
+## Done by Debojit,
+## Chategories of body regions of injury 
+## divided as per AIS codes
+## separating contents of a column into different columns
+
+n<- n %>% separate(head_and_neck, c("a1"))
+n<- n %>% separate(face, c("b1"))
+n<- n %>% separate(chest, c("c1"))
+n<- n %>% separate(abdomen_and_pelvic_contents, c("d1"))
+n<- n %>% separate(extremities, c("e1"))
+n<- n %>% separate(external, c("f1","f2"))
+#n <- n %>% mutate_all(funs(replace_na(.,0)))
+
+n$a1 <- replace(n$a1,n$a1 >= 1,1)
+n$b1 <- replace(n$b1,n$b1 >= 1, 8)
+n$c1 <- replace(n$c1,n$c1 >= 1,27)
+n$d1 <- replace(n$d1,n$d1 >= 1,64)
+n$e1<- replace(n$e1, n$e1 >= 1, 125)
+
+ais4 <-select(n, pid,a1, b1, c1, d1, e1, f1,f2,died)
+
+ais4$died <- as.factor(ais4$died)
+ais4$a1 <- as.numeric(ais4$a1)
+ais4$b1 <- as.numeric(ais4$b1)
+ais4$c1 <- as.numeric(ais4$c1)
+ais4$d1 <- as.numeric(ais4$d1)
+ais4$e1 <- as.numeric(ais4$e1)
+#View(titcofall)
+
+## polytrauma >= 1 and isolated injury = 0
+  
+p5 <- ais4["tbi"] <- rowSums(ais4[,c("a1","b1","c1","d1","e1")], na.rm = T)
+
+## Intricate catogorizing
+p6 <- n["tbi"]<-  ifelse(ais4$tbi == 1, "Isolated Head Injury",
+                           ifelse(ais4$tbi == 8, "Isolated face Injury",
+                                  ifelse(ais4$tbi == 27, "Isolated chest Injury",
+                                         ifelse(ais4$tbi == 64, "isolated Abdomen injury",
+                                                ifelse(ais4$tbi == 125,"Isolated Limb injury",
+                                                       ifelse(ais4$tbi == 9, "Head and Face injury",
+                                                              ifelse(ais4$tbi == 28, "Head and chest injury",
+                                                                     ifelse(ais4$tbi == 65, "Head and abdomen injury",
+                                                                            ifelse(ais4$tbi == 126, "Head and limb injury",
+                                                                                   ifelse(ais4$tbi == 35, " Face and Chest Injury",
+                                                                                          ifelse(ais4$tbi == 72, "Face and Abdomen Injury",
+                                                                                                 ifelse(ais4$tbi == 91, "chest and Abdomen injury",
+                                                                                                        ifelse(ais4$tbi == 133, "Face and Limb Injury",
+                                                                                                               ifelse(ais4$tbi == 152 , "Chest and Limb Injury",
+                                                                                                                      ifelse(ais4$tbi == 189, "Abdomen and Limb Injury",
+                                                                                        
+                                                                                          ifelse(ais4$tbi == 36, "Head, Face and Chest injury",
+                                                                                                 ifelse(ais4$tbi == 92, "Head, Chest and Abdomen injury",
+                                                                                                        ifelse(ais4$tbi == 190, "Head, Abdomen and Limb Injury",
+                                                                                                        ifelse(ais4$tbi == 99, "Face, Chest and Abdomen injury",
+                                                                                                               ifelse(ais4$tbi == 197, "Face, Abdomen and Limb Injury",
+                                                                                                               ifelse(ais4$tbi == 134, " Head, Face and Limb Injury",
+                                                                                                                      ifelse(ais4$tbi == 153, "Head, Chest and limb injury",
+                                                                                                                             ifelse(ais4$tbi == 216, "Chest, Abdomen and Limb Injury",
+                                                                                                                             ifelse(ais4$tbi== 160, "Face, Chest and Limb Injury",
+                                                                                                                                    ifelse(ais4$tbi == 161, " Head, Face, Chest and Limb Injury",
+                                                                                                                                           ifelse(ais4$tbi == 198, "Head,Face,Abdomen, limb Injury",
+                                                                                                                                                  ifelse(ais4$tbi ==217, "Head, Chest, Abdomen, limb Injury",
+                                                                                                                                                         ifelse(ais4$tbi== 224, "Face, chest, Abdomen, Limb Injury",
+                                                                                                                                                                ifelse(ais4$tbi == 225, "Head,Face,Chest,Abdomen,Limb injury", NA )))))))
+                                                                                                                      ))))))))))))))))))))))
+
+## Intricate catogorizing
+p7 <- n["tbi2"]<-  ifelse(ais4$tbi == 1, "Isolated Traumatic brain  Injury",
+                           ifelse(ais4$tbi == 8, "Isolated face Injury",
+                                  ifelse(ais4$tbi == 27, "Isolated chest Injury",
+                                         ifelse(ais4$tbi == 64, "Isolated Abdomen injury",
+                                                ifelse(ais4$tbi == 125,"Isolated Limb injury",
+                                                       ifelse(ais4$tbi == 9, "Polytrauma (including TBI)",
+                                                              ifelse(ais4$tbi == 28, "Polytrauma (including TBI)",
+                                                                     ifelse(ais4$tbi == 65, "Polytrauma (including TBI)",
+                                                                            ifelse(ais4$tbi == 126, "Polytrauma (including TBI)",
+                                                                                   ifelse(ais4$tbi == 35, "Polytrauma (excluding TBI)",
+                                                                                          ifelse(ais4$tbi == 72, "Polytrauma (excluding TBI)",
+                                                                                                 ifelse(ais4$tbi == 91, "Polytrauma (excluding TBI)",
+                                                                                                        ifelse(ais4$tbi == 133, "Polytrauma (excluding TBI)",
+                                                                                                               ifelse(ais4$tbi == 152 , "Polytrauma (excluding TBI)",
+                                                                                                                      ifelse(ais4$tbi == 189, "Polytrauma (excluding TBI)",
+                                                                                        
+                                                                                          ifelse(ais4$tbi == 36, "Polytrauma (including TBI)",
+                                                                                                 ifelse(ais4$tbi == 92, "Polytrauma (including TBI)",
+                                                                                                        ifelse(ais4$tbi == 190, "Polytrauma (including TBI)",
+                                                                                                        ifelse(ais4$tbi == 99, "Polytrauma (excluding TBI)",
+                                                                                                               ifelse(ais4$tbi == 197, "Polytrauma (excluding TBI)",
+                                                                                                               ifelse(ais4$tbi == 134, "Polytrauma (including TBI)",
+                                                                                                                      ifelse(ais4$tbi == 153, "Polytrauma (including TBI)",
+                                                                                                                             ifelse(ais4$tbi == 216, "Polytrauma (excluding TBI)",
+                                                                                                                             ifelse(ais4$tbi== 160, "Polytrauma (excluding TBI)",
+                                                                                                                                    ifelse(ais4$tbi == 161, "Polytrauma (including TBI)",
+                                                                                                                                           ifelse(ais4$tbi == 198, "Polytrauma (including TBI)",
+                                                                                                                                                  ifelse(ais4$tbi ==217, "Polytrauma (including TBI)",
+                                                                                                                                                         ifelse(ais4$tbi== 224, "Polytrauma (excluding TBI)",
+                                                                                                                                                                ifelse(ais4$tbi == 225, "Polytrauma (including TBI)", NA )))))))
+                                                                                                                      ))))))))))))))))))))))
+
+## Broad categorising
+p8 <- n["tbi3"]<-  ais4["tbi3"] <-ifelse(ais4$tbi == 1, "Isolated Head Injury",
+                           ifelse(ais4$tbi == 8, "others",
+                                  ifelse(ais4$tbi == 27, "others",
+                                         ifelse(ais4$tbi == 64, "others",
+                                                ifelse(ais4$tbi == 125,"others",
+                                                       ifelse(ais4$tbi == 9, "Head and others",
+                                                              ifelse(ais4$tbi == 28, "Head and others",
+                                                                     ifelse(ais4$tbi == 65, "Head and others",
+                                                                            ifelse(ais4$tbi == 126, "Head and others",
+                                                                                   ifelse(ais4$tbi == 35, "others",
+                                                                                          ifelse(ais4$tbi == 72, "others",
+                                                                                                 ifelse(ais4$tbi == 91, "others",
+                                                                                                        ifelse(ais4$tbi == 133, "others",
+                                                                                                               ifelse(ais4$tbi == 152 , "others",
+                                                                                                                      ifelse(ais4$tbi == 189, "others",
+                                                                                        
+                                                                                          ifelse(ais4$tbi == 36, "Head and others",
+                                                                                                 ifelse(ais4$tbi == 92, "Head and others",
+                                                                                                        ifelse(ais4$tbi == 190, "Head and others",
+                                                                                                        ifelse(ais4$tbi == 99, "others",
+                                                                                                               ifelse(ais4$tbi == 197, "others",
+                                                                                                               ifelse(ais4$tbi == 134, "Head and others",
+                                                                                                                      ifelse(ais4$tbi == 153, "Head and others",
+                                                                                                                             ifelse(ais4$tbi == 216, "others",
+                                                                                                                             ifelse(ais4$tbi== 160, "others",
+                                                                                                                                    ifelse(ais4$tbi == 161, "Head and others",
+                                                                                                                                           ifelse(ais4$tbi == 198, "Head and others",
+                                                                                                                                                  ifelse(ais4$tbi ==217, "Head and others",
+                                                                                                                                                         ifelse(ais4$tbi== 224, "others",
+                                                                                                                                                                ifelse(ais4$tbi == 225, "Head and others", NA )))))))
+                                                                                                                      ))))))))))))))))))))))
+# All injury column - ICD codes
+n <- suppressWarnings(suppressMessages(unite(n, allinj, contains("icd"), sep = ",", remove = FALSE)))
+
+# Selecting only required coulmns
+
+dt <- n  %>% dplyr::select(pid, age, sex, tran, doi, toi, doar, toar, doa, toa, moi, mot, ti, gcs_t_1, intub_1, saw_1, icd_1, tos, losu, ct, fast, xray, dama, dodd, todd, iss, niss, died, tbi, tbi2, tbi3, allinj)
+
+#dt <- subset(d, d$moi == "Fall")
+dt <- dt[!is.na(dt$died),] #5206, 0 missing
+dt <- dt[!is.na(dt$age),] #5190, 16 missing, 0.3%
+dt <- dt[!is.na(dt$sex),] #0 missing
+dt <- dt[!is.na(dt$tran),] #5174, 16 missing, 0.3%
+dt <- dt[!is.na(dt$doi),] #5095, 79 missing, 1.5%
+dt <- dt[!is.na(dt$toi),] #4817, 278 missing, 5.3%
+dt <- dt[!is.na(dt$doar),] #4793, 24 missing, 0.5%
+dt <- dt[!is.na(dt$toar),] #4788, 5 missing, 0.1%
+dt <- dt[!is.na(dt$doa),] #4763, 25 missing, 0.5%
+dt <- dt[!is.na(dt$toa),] #4762, 1 missing, 0.02%
+dt <- dt[!is.na(dt$moi),] #0 missing
+dt <- dt[!is.na(dt$mot),] #4695, 67 missing, 1.3%
+dt <- dt[!is.na(dt$ti),] #0 missing
+dt <- dt[!is.na(dt$gcs_t_1),] #4322, 373 missing, 7.2%
+dt <- dt[!is.na(dt$intub_1),] #0 missing
+dt <- dt[!is.na(dt$saw_1),] #0missing
+dt <- dt[!is.na(dt$icd_1),] #4321, 1 missing, 0.02%
+dt <- dt[!is.na(dt$tos),] #0 missing
+dt <- dt[!is.na(dt$losu),] #4312, 9 missing, 0.2%
+dt <- dt[!is.na(dt$ct),] #4303, 9 missing, 0.2%
+dt <- dt[!is.na(dt$fast),] #0 missing
+dt <- dt[!is.na(dt$xray),] #0 missing
+dt <- dt[!is.na(dt$dama),] #4302, 1 missing, 0.02%
+dt <- dt[!is.na(dt$dodd),] #4296, 6 missing, 0.1%
+dt <- dt[!is.na(dt$todd),] #4295,1 missing, 0.02%
+dt <- dt[!is.na(dt$iss),] #3823, 472 missing, 9%
+dt <- dt[!is.na(dt$niss),] #0 missing
+dt <- dt[!is.na(dt$allinj),] #0 missing
+dt <- dt[!is.na(dt$tbi),] #3686, 137 missing, 2.6%
+dt <- dt[!is.na(dt$tbi2),] #0 missing
+dt <- dt[!is.na(dt$tbi3),] #0 missing
+
+#Complete case analysis
+complete.index <- complete.cases(dt)
+#n.incomplete <- sum(!complete.index)
+#p.incomplete <- round((n.incomplete/nrow(dt)) * 100,1)
+dt <- dt[complete.index, ]
+
+# ---------------------- Demographic columns -----------------------------
+
+## Grouping age
+agebreaks <- c(0,17,25,45,65,98)
+agelabels <- c("<18","18-24","25-44","45-64","65+")
+#dt$age <- as.numeric(dt$age)
+#summary(dt$age) #8 missing introduced due to coercion
+dt$agegrp <-cut(dt$age,
+                breaks = agebreaks,
+                right = FALSE,
+                labels = agelabels)
+
+agebreaks <- c(0,11,21,31,41,51,61,71,81,91,101)
+agelabels <- c("0-10","11-20","21-30","31-40","41-50","51-60","61-70","71-80","81-90","91-100")
+#dt$age <- as.numeric(dt$age)
+#summary(dt$age) #8 missing introduced due to coercion
+dt$ageten <-cut(dt$age,
+                breaks = agebreaks,
+                right = FALSE,
+                labels = agelabels)
+
+## First Delay
+start.time <- paste(dt$doi, dt$toi)
+end.time <- paste(dt$doar, dt$toar)
+dt$first.delay <- round(difftime(end.time,start.time, units = "hours"),0)
+
+# ----------------------Injury Characteristics -----------------------
+
+#Grouping GCS
+gcsbreaks <- c(2,9,13,16)
+gcslabels <- c("Severe","Moderate","Mild")
+dt$gcspv <-cut(dt$gcs_t_1,
+                breaks = gcsbreaks,
+                right = FALSE,
+                labels = gcslabels)
+
+## Goruping ISS 
+issbreaks <- c(1,9,16,25,109)
+isslabels <- c("Mild","Moderate","Severe","Profound")
+dt$isspv <-cut(dt$iss,
+                breaks = issbreaks,
+                right = FALSE,
+                labels = isslabels)
+
+#Characteristics of Injury
+
+internal_inj <- str_c(c("s06","s06.0","s06.1","s06.2","s06.3","s06.4","s06.5","s06.6","s06.7","s06.8","s06.9","t90.5","s14.0","s14.1","s24.0","s24.1","s34.0","s34.1","s34.3","t09.3","t91.3","s14.2","s26.0","s27.0","s27.1","s27.2","s27.3","s27.4","s27.5","s27.6","s27.8","s27.9","t91.4","s36","s36.0","s36.1","s36.2","s36.3","s36.4","s36.5","s36.6","s36.7","s36.8","s36.9","s37","s37.0","s37.1","s37.2","s37.3","s37.4","s37.5","s37.6","s37.7","s37.8","s37.9","s39.6","s39.7","t06.5","t91.5"),collapse = "|")
+
+frac_inj <- str_c(c("s02","s02.0","s02.1","s02.3","s02.7","s02.9","t90.2","s02.2","s02.4","s02.5","s02.6","s12","s12.8","s12.9","s12.0","s12.1","s12.2","s12.3","s12.4","s12.5","s12.6","s12.7","s22","s22.0","s22.1","s32","s32.0","s32.1","s32.2","t08","t91.1","s22.2","s22.3","s22.4","s22.5","s22.6","s22.7","s22.8","s22.9","s32.3","s32.4","s32.5","s32.6","s32.7","s32.8","t02.1","t91.2","s42","s42.0","s42.1","s42.2","s42.3","s42.4","s42.7","s42.8","s42.9","s52","s52.0","s52.1","s52.2","s52.3","s52.4","s52.5","s52.6","s52.7","s52.8","s52.9","s62","s62.0","s62.1","s62.2","s62.3","s62.4","s62.5","s62.6","s62.7","s62.8","t02.2","t02.4","t10","t92.1","t92.2","s72","s72.0","s72.1","s72.2","s72.3","s72.4","s72.5","s72.6","s72.7","s72.8","s72.9","s82","s82.0","s82.1","s82.2","s82.3","s82.4","s82.5","s82.6","s82.7","s82.8","s82.9","s92","s92.0","s92.1","s92.2","s92.3","s92.4","s92.5","s92.7","s92.9","t02.3","t02.5","t12","t93.1","t93.2","t02.8","t02.9","t14.2"),collapse = "|")
+
+dt$frac_inj <- if_else(str_detect(dt$allinj, frac_inj),"Yes","No")
+dt$internal_inj <- if_else(str_detect(dt$allinj, internal_inj),"Yes","No")
+
+dt$frac_inter_inj <- if_else(str_detect(dt$allinj, frac_inj)&str_detect(dt$allinj,internal_inj),"Both",
+                  if_else(str_detect(dt$allinj,internal_inj),"Internal",
+                          if_else(str_detect(dt$allinj,frac_inj),"Fracture","A")))
+
+table(dt$frfrac_inter_inj)
+
+# ------------------------ Outcomes ------------------------------
+
+#Surgery
+dt$surg <- if_else(dt$tos == 0, "Yes","No")
+
+table(dt$surg,dt$died)
+
+# Hospital disposition
+dt$hd <- if_else(dt$dama == "Yes", "DAMA",
+                 if_else(dt$died=="Yes","Died","Discharged"))
+
+## Length of hospital stay
+start.time <- paste(dt$doar, dt$toar)
+end.time <- paste(dt$dodd, dt$todd)
+dt$lohps<- as.numeric(round(difftime(end.time,start.time, units = "days"),0))
+
+los1 <- dt["lengthofstay1"] <- as.factor(ifelse(dt$lohps <25, "within 24hrs",
+                                  ifelse(dt$lohps>24 & dt$lohps<73,"24-72hrs",
+                                         ifelse(dt$lohps>72 & dt$lohps<169,"3-7days",">7 days"))))
+
+#Tables
+
+table(dt$isspv,dt$died)
+
+myvars <- c("age","agegrp", "sex", "tran", "mot", "ti","first.delay","delay_p", "gcs_t_1","gcspv", "intub_1","saw_1", "icd_1","iss","isspv", "niss", "died")
+catvars <- c("agegrp","sex", "tran", "mot", "ti", "gcspv", "intub_1","saw_1", "icd_1","isspv", "niss", "died")
+
+Table1 <- CreateTableOne(vars = myvars, data=dt,strata = "died", factorVars = catvars)
+knitr::kable(print(Table1,
+                   caption = "Table 1. Demographic, Physiological parameters, Injury Characteristics", showAllLevels = TRUE, printToggle = FALSE, varLabels = TRUE))
+
+table1 <- dt %>% select(age,agegrp,sex,tran,mot,ti,first.delay,gcspv,intub_1,saw_1,icd_1,isspv,tbi2,died)
+
+table1 <- dt %>% select(age,agegrp,sex,tran,mot,ti,died)
+
+table1 %>%
+  tbl_summary(by = c(died),
+              missing = "no") %>%
+  add_p() %>%
+  add_overall() %>%
+  add_n()
+
+d1 <- subset(dt, dt$died == "Yes")
+d2 <- subset(dt, dt$died == "No")
+
+Table_age_ten <- CreateTableOne(vars = c("ageten"), data=dt, strata = c("tbi2","died"))
+knitr::kable(print(Table_age_ten,
+                   caption = "Table 2. GCS and ISS of dead patients with TBI and TBI associated injuries", showAllLevels = TRUE, printToggle = FALSE, varLabels = TRUE))
+
+Table2 <- CreateTableOne(vars = c("isspv","gcspv"), data=dt, strata = c("tbi2","died"))
+knitr::kable(print(Table2,
+                   caption = "Table 2. GCS and ISS of dead patients with TBI and TBI associated injuries", showAllLevels = TRUE, printToggle = FALSE, varLabels = TRUE))
+
+Table3 <- CreateTableOne(vars = "surg", data=dt,strata = "died", factorVars = catvars)
+knitr::kable(print(Table3,
+                   caption = "Table 1. Demographic, Physiological parameters, Injury Characteristics", showAllLevels = TRUE, printToggle = FALSE, varLabels = TRUE))
+
+Table4 <- CreateTableOne(vars = c("frac_inter_inj"), data=dt, strata = c("tbi2","died"))
+knitr::kable(print(Table4,
+                   caption = "Table 2. GCS and ISS of dead patients with TBI and TBI associated injuries", showAllLevels = TRUE, printToggle = FALSE, varLabels = TRUE))
+
+Table4 <- CreateTableOne(vars = c("tbi2"), data=dt, strata = c("died"))
+knitr::kable(print(Table4,
+                   caption = "Table 4. Pattern of injury and mortality", showAllLevels = TRUE, printToggle = FALSE, varLabels = TRUE))
+
+#Regression
+dt$died <- ifelse(dt$died=="Yes",1,0)
+
+dt$gcspv <- relevel(dt$gcspv, ref = "Mild")
+
+levels(dt$gcspv)
+
+# for isolated head injury
+h1  <- filter(dt, tbi2 == "Isolated Head Injury")
+h1$died <- as.factor(h1$died)
+m11 <- glm(h1$died~h1$gcspv+h1$isspv, family = binomial(link = "logit"))
+summ(m1, exp = T)
+tbl_regression(m11, exponentiate = TRUE)
+
+m12 <- glm(h1$died~h1$gcspv, family = binomial(link = "logit"))
+summ(m12, exp = T)
+tbl_regression(m12, exponentiate = TRUE)
+
+m13 <- glm(h1$died~h1$isspv, family = binomial(link = "logit"))
+summ(m13, exp = T)
+tbl_regression(m13, exponentiate = TRUE)
+
+m14 <- glm(h1$died~h1$lengthofstay1, family = binomial(link = "logit"))
+summ(m14, exp = T)
+tbl_regression(m14, exponentiate = TRUE)
+
+
+
+#for head injury plus other injury
+h2 <- filter(dt, tbi2 == "Head and others")
+h2$died <- as.factor(h2$died)
+m21 <- glm(h2$died~h2$gcspv+h2$isspv, family = binomial(link = "logit"))
+summ(m21, exp = T)
+tbl_regression(m21, exponentiate = TRUE)
+
+m22 <- glm(h2$died~h2$gcspv, family = binomial(link = "logit"))
+summ(m22, exp = T)
+tbl_regression(m22, exponentiate = TRUE)
+
+m23 <- glm(h2$died~h2$isspv, family = binomial(link = "logit"))
+summ(m23, exp = T)
+tbl_regression(m23, exponentiate = TRUE)
+
+m24 <- glm(h2$died~h2$lengthofstay1, family = binomial(link = "logit"))
+summ(m24, exp = T)
+tbl_regression(m24, exponentiate = TRUE)
+
+# for any injury excluding head injury
+h3 <- filter(dt, tbi2 == "others")
+h3$died <- as.factor(h3$died)
+m3 <- glm(h3$died~h3$gcspv+h3$isspv, family = binomial(link = "logit"))
+summ(m3, exp = T)
+tbl_regression(m3, exponentiate = TRUE)
+
+m32 <- glm(h3$died~h3$gcspv, family = binomial(link = "logit"))
+summ(m32, exp = T)
+tbl_regression(m32, exponentiate = TRUE)
+
+m33 <- glm(h3$died~h3$isspv, family = binomial(link = "logit"))
+summ(m33, exp = T)
+tbl_regression(m33, exponentiate = TRUE)
+
+m34 <- glm(h3$died~h3$lengthofstay1, family = binomial(link = "logit"))
+summ(m34, exp = T)
+tbl_regression(m34, exponentiate = TRUE)
+
+summaryBy(lohps ~ tbi2,data =dt,
+          FUN = list(median,IQR, mean, sd, min, max))
+
+table(dt$dama)
+
+dt$outcome <- ifelse(dt$dama == "Yes", "DAMA",
+                     ifelse(dt$died == "Yes", "Died", "Discharge"))
+
+table(dt$outcome)
+
+
+# Kaplan meir plot
+
+dt$status<- ifelse(dt$died=="Yes",1,0)
+sfit <- survfit(formula = Surv(dt$lohps, dt$status) ~ dt$agegrp, data = dt)
+ggsurvplot(sfit, 
+           pval = TRUE,
+           pval.coord = c(300, 0.8),
+           legend.labs = c("<18", "18-24","25-44","45-64","65+"), 
+           legend.title =  "Age", 
+           title = "Kaplan-Meier Curve for Fall Survival",
+           palette = "grey",) # custom color palette
+
+median(dt$lohps[dt$tbi3 == "Head and others"])
+median(dt$lohps[dt$tbi3 == "Isolated Head Injury"])
+median(dt$lohps[dt$tbi3 == "others"])
+
+IQR(dt$lohps[dt$tbi3 == "Head and others"])
+IQR(dt$lohps[dt$tbi3 == "Isolated Head Injury"])
+IQR(dt$lohps[dt$tbi3 == "others"])
+
+table(dt$tbi3)
+
+```
+
+
+
