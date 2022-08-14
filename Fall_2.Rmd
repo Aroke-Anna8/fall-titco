@@ -221,14 +221,17 @@ dt <- dt[complete.index, ]
 # ---------------------- Demographic columns -----------------------------
 
 ## Grouping age
-agebreaks <- c(0,17,25,45,65,98)
-agelabels <- c("<18","18-24","25-44","45-64","65+")
+agebreaks <- c(0,1,15,25,45,65,98)
+agelabels <- c("<1","1-14","15-24","25-44","45-64","65+")
 #dt$age <- as.numeric(dt$age)
 #summary(dt$age) #8 missing introduced due to coercion
 dt$agegrp <-cut(dt$age,
                 breaks = agebreaks,
                 right = FALSE,
                 labels = agelabels)
+
+table(dt$age)
+table(dt$agegrp)
 
 agebreaks <- c(0,11,21,31,41,51,61,71,81,91,101)
 agelabels <- c("0-10","11-20","21-30","31-40","41-50","51-60","61-70","71-80","81-90","91-100")
@@ -423,13 +426,28 @@ table(dt$outcome)
 
 dt$status<- ifelse(dt$died=="Yes",1,0)
 sfit <- survfit(formula = Surv(dt$lohps, dt$status) ~ dt$agegrp, data = dt)
-ggsurvplot(sfit, 
+survplot <- ggsurvplot(sfit,
            pval = TRUE,
-           pval.coord = c(300, 0.8),
-           legend.labs = c("<18", "18-24","25-44","45-64","65+"), 
+           #conf.int = TRUE,
+           #conf.int.style = "step",
+           pval.coord = c(350, 0.98),
+           legend.labs = c("<1","1-14","15-24","25-44","45-64","65+"), 
            legend.title =  "Age", 
+           censor = TRUE,
+           censor.shape = "|",
+           censor.size = 2,
+           break.y.by = 0.10,
            title = "Kaplan-Meier Curve for Fall Survival",
+           ylab = c("Probability of mortality"),
+           xlab = c("Time (hrs)"),
+           risk.table = "abs_pct", # Change risk table color by groups
+           risk.table.col = "strata",
+           surv.plot.height = 2.0,
+           tables.height = 0.3,
+           tables.theme = theme_cleantable(),
            palette = "grey",) # custom color palette
+
+
 
 median(dt$lohps[dt$tbi3 == "Head and others"])
 median(dt$lohps[dt$tbi3 == "Isolated Head Injury"])
@@ -440,6 +458,10 @@ IQR(dt$lohps[dt$tbi3 == "Isolated Head Injury"])
 IQR(dt$lohps[dt$tbi3 == "others"])
 
 table(dt$tbi3)
+
+
+
+
 
 ```
 
